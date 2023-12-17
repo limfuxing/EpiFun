@@ -1,0 +1,15 @@
+Package: EpiFun
+Title: A collection of functions for Epi Modelling
+Version: 0.0.0.1
+Authors@R: 
+    person("Agus", "Salim", , "limfuxing@gmail.com", role = c("aut", "cre"),
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: What the package does (one paragraph).
+License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
+    license
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Imports: MASS (>= 7.3-60), openxlsx (>= 4.2.5.2), plotly (>= 4.10.1), ggplot2 (>= 3.4.2)
+Depends: 
+    R (>= 4.2.2)
+RoxygenNote: 7.2.3
