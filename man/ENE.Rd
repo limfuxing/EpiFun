@@ -11,9 +11,9 @@ ENE(file, reg.model = c("poisson", "NB"), save = TRUE, save.plot = TRUE)
 
 \item{reg.model}{Regression model used to estimate the statistic. The default is Poisson regression with Negative Binomial regression as alternative.}
 
-\item{save}{whether to automatically save the output as a CSV file.}
+\item{save}{whether to automatically save the output as a CSV file. If TRUE, output will be saved in analysis_output.csv file under the current working directory.}
 
-\item{save.plot}{whether to produce volcano plot and save it as a plotly object in an HTML file.}
+\item{save.plot}{whether to produce volcano plot and save it as a plotly object in an HTML file. If TRUE, a volcano plot will be saved in volcanoplot.HTML under the current working directory.}
 }
 \value{
 A table containing the ENE statistic (per 100,000 person-years) for each condition and agegroup.
