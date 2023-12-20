@@ -1,6 +1,6 @@
 Package: EpiFun
 Title: A collection of functions for Epi Modelling
-Version: 0.0.0.1
+Version: 0.1.0.1
 Authors@R: 
     person("Agus", "Salim", , "limfuxing@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))

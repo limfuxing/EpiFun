@@ -69,15 +69,19 @@ sheet.trt <- sheet[-grep('Control',sheet)]
     # model for agegroup-specific estimate
     if(reg.model[1]=='poisson')
      model.adj   <- glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub)
-    if(reg.model[1]=='NB')
-     model.adj   <- MASS::glm.nb(count~status*agegrp+Year+offset(log(PY)),data=data.sub)
+    if(reg.model[1]=='NB') {
+     model.adj   <- tryCatch({MASS::glm.nb(count~status*agegrp+Year+offset(log(PY)),data=data.sub)}, error = function(e) 
+			{glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub)})
+    }
     # model for overall estimate
     contrasts(data.sub$agegrp) <- contr.sum
     X  <- model.matrix(~status*agegrp+Year,contr.arg=list(agegrp='contr.sum',Year='contr.sum'),data=data.sub)
     if(reg.model[1]=='poisson')
      model2.adj   <- glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub)
-    if(reg.model[1]=='NB')
-     model2.adj   <- MASS::glm.nb(count~X[,-1]+offset(log(PY)),data=data.sub)
+    if(reg.model[1]=='NB') {
+     model2.adj   <- tryCatch({MASS::glm.nb(count~X[,-1]+offset(log(PY)),data=data.sub)}, error = function(e) 
+			{glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub)})
+    }
     # start calculating agegroup-specific statistics
     lev <- levels(data.sub$agegrp)
     nlev <- length(lev)
@@ -93,12 +97,18 @@ sheet.trt <- sheet[-grep('Control',sheet)]
 			vcov(model.adj)[ncoef-nlev+match(agegroup,lev),1+match(agegroup,lev)])*(match(agegroup,lev)>1)
       ExHosp <- (exp(beta)-1)*exp(vbeta0)*100000
       SE.log.Exhosp=sqrt((exp(beta)/(exp(beta)-1))^2 * (vbeta+2*covbbeta0*(exp(beta)-1)/exp(beta)) + vbeta0)
+      SE.ExHosp = abs(ExHosp)*SE.log.Exhosp
             adj.est <- rbind(adj.est,data.frame(SubCat=subc[i],agegrp=agegroup,
 					               logPR=beta,SE=sqrt(vbeta),logPR_ci_lower=beta-1.96*sqrt(vbeta),
-					logPR_ci_upper=beta+1.96*sqrt(vbeta),ExHosp=ExHosp,ExHosp_ci_lower=ExHosp*exp(-1.96*SE.log.Exhosp),
-					ExHosp_ci_upper=ExHosp*exp(1.96*SE.log.Exhosp)))
+					logPR_ci_upper=beta+1.96*sqrt(vbeta),ExHosp=ExHosp,ExHosp_ci_lower=ExHosp-1.96*SE.ExHosp,
+					ExHosp_ci_upper=ExHosp+1.96*SE.ExHosp))
     }
     # get overall statistic
+    #data.sub.trt = subset(data.sub,status!='Control')
+    #virtual.pop <- aggregate(data.sub.trt$count,by=list(agegroup=data.sub.trt$agegrp),sum)
+    #virtual.pop$x <- virtual.pop$x/sum(virtual.pop$x)
+    #virtual.pop <- virtual.pop[match(lev,virtual.pop$agegroup),]
+
     beta0 = summary(model2.adj)$coef[1,1] 
     vbeta0=vcov(model2.adj)[1,1]
     beta = summary(model2.adj)$coef[2,1] 
@@ -106,11 +116,13 @@ sheet.trt <- sheet[-grep('Control',sheet)]
     covbbeta0 = vcov(model2.adj)[1,2]
     ExHosp <- (exp(beta)-1)*exp(vbeta0)*100000
     SE.log.Exhosp=sqrt((exp(beta)/(exp(beta)-1))^2 * (vbeta+2*covbbeta0*(exp(beta)-1)/exp(beta)) + vbeta0)
+    SE.ExHosp = abs(ExHosp)*SE.log.Exhosp
+
     adj.est <- rbind(adj.est,data.frame(SubCat=subc[i],agegrp="Overall",
 					logPR=beta,
                                         SE=sqrt(vbeta),logPR_ci_lower=beta-1.96*sqrt(vbeta),
-					logPR_ci_upper=beta+1.96*sqrt(vbeta),ExHosp=ExHosp,ExHosp_ci_lower=ExHosp*exp(-1.96*SE.log.Exhosp),
-					ExHosp_ci_upper=ExHosp*exp(1.96*SE.log.Exhosp)))
+					logPR_ci_upper=beta+1.96*sqrt(vbeta),ExHosp=ExHosp,ExHosp_ci_lower=ExHosp-1.96*SE.ExHosp,
+					ExHosp_ci_upper=ExHosp+1.96*SE.ExHosp))
 
   }
 TEvent       <- rbind(TEvent,aggregate(data.all$count,by=list(SubCat=data.all$SubCat,agegrp=data.all$agegrp),sum))
