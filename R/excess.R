@@ -95,41 +95,62 @@ sheet.trt <- sheet[-grep('Control',sheet)]
   	      (diag(vcov(model.adj))[ncoef-nlev+match(agegroup,lev)])*(match(agegroup,lev)>1)
       covbbeta0 = vcov(model.adj)[1,2] + (vcov(model.adj)[1,1+match(agegroup,lev)] + vcov(model.adj)[2,ncoef-nlev+match(agegroup,lev)] +
 			vcov(model.adj)[ncoef-nlev+match(agegroup,lev),1+match(agegroup,lev)])*(match(agegroup,lev)>1)
-      ExHosp <- (exp(beta)-1)*exp(vbeta0)*100000
+      ExHosp <- (exp(beta)-1)*exp(beta0)*100000
       SE.log.Exhosp=sqrt((exp(beta)/(exp(beta)-1))^2 * (vbeta+2*covbbeta0*(exp(beta)-1)/exp(beta)) + vbeta0)
       SE.ExHosp = abs(ExHosp)*SE.log.Exhosp
             adj.est <- rbind(adj.est,data.frame(SubCat=subc[i],agegrp=agegroup,
 					               logPR=beta,SE=sqrt(vbeta),logPR_ci_lower=beta-1.96*sqrt(vbeta),
-					logPR_ci_upper=beta+1.96*sqrt(vbeta),ExHosp=ExHosp,ExHosp_ci_lower=ExHosp-1.96*SE.ExHosp,
-					ExHosp_ci_upper=ExHosp+1.96*SE.ExHosp))
+					logPR_ci_upper=beta+1.96*sqrt(vbeta),ExEvent=ExHosp,ExEvent_ci_lower=ExHosp-1.96*SE.ExHosp,
+					ExEvent_ci_upper=ExHosp+1.96*SE.ExHosp))
     }
     # get overall statistic
-    #data.sub.trt = subset(data.sub,status!='Control')
-    #virtual.pop <- aggregate(data.sub.trt$count,by=list(agegroup=data.sub.trt$agegrp),sum)
-    #virtual.pop$x <- virtual.pop$x/sum(virtual.pop$x)
-    #virtual.pop <- virtual.pop[match(lev,virtual.pop$agegroup),]
+    data.sub.ctl = subset(data.sub,status=='Control')
+    virtual.pop <- aggregate(data.sub.ctl$PY,by=list(agegroup=data.sub.ctl$agegrp),sum)
+    virtual.pop$x <- virtual.pop$x/sum(virtual.pop$x)
+    virtual.pop <- virtual.pop[match(lev,virtual.pop$agegroup),]
+    
+    SE.ExHosp<- sqrt(sum(virtual.pop$x^2*((adj.est$ExEvent_ci_upper[adj.est$SubCat==subc[i]] - adj.est$ExEvent_ci_lower[adj.est$SubCat==subc[i]])/3.92)^2))
+    beta   <- weighted.mean(adj.est$logPR[adj.est$SubCat==subc[i]],w=virtual.pop$x)
+    vbeta  <- sqrt(sum(virtual.pop$x^2 * ((adj.est$logPR_ci_upper[adj.est$SubCat==subc[i]] - adj.est$logPR_ci_lower[adj.est$SubCat==subc[i]])/3.92)^2))
+    ExHosp <- weighted.mean(adj.est$ExEvent[adj.est$SubCat==subc[i]],w=virtual.pop$x)
 
-    beta0 = summary(model2.adj)$coef[1,1] 
-    vbeta0=vcov(model2.adj)[1,1]
-    beta = summary(model2.adj)$coef[2,1] 
-    vbeta = diag(vcov(model2.adj))[2] 
-    covbbeta0 = vcov(model2.adj)[1,2]
-    ExHosp <- (exp(beta)-1)*exp(vbeta0)*100000
-    SE.log.Exhosp=sqrt((exp(beta)/(exp(beta)-1))^2 * (vbeta+2*covbbeta0*(exp(beta)-1)/exp(beta)) + vbeta0)
-    SE.ExHosp = abs(ExHosp)*SE.log.Exhosp
+    #beta0 = summary(model2.adj)$coef[1,1] + (summary(model2.adj)$coef[1+match(agegroup,lev),1])*(match(agegroup,lev)>1)
+    #vbeta0=vcov(model2.adj)[1,1]+
+    #	      (vcov(model2.adj)[1+match(agegroup,lev),1+match(agegroup,lev)] + 2*vcov(model2.adj)[1,1+match(agegroup,lev)])*(match(agegroup,lev)>1)
+    #beta = summary(model.adj)$coef[2,1]  + (summary(model.adj)$coef[ncoef-nlev+match(agegroup,lev),1])*(match(agegroup,lev)>1)
+    #vbeta =diag(vcov(model2.adj))[2] +
+    #	      (diag(vcov(model2.adj))[ncoef-nlev+match(agegroup,lev)])*(match(agegroup,lev)>1)
+    #covbbeta0 = vcov(model2.adj)[1,2] + (vcov(model2.adj)[1,1+match(agegroup,lev)] + vcov(model2.adj)[2,ncoef-nlev+match(agegroup,lev)] +
+    #			vcov(model2.adj)[ncoef-nlev+match(agegroup,lev),1+match(agegroup,lev)])*(match(agegroup,lev)>1)
+    #ExHosp <- (exp(beta)-1)*exp(beta0)*100000
+    #SE.log.Exhosp=sqrt((exp(beta)/(exp(beta)-1))^2 * (vbeta+2*covbbeta0*(exp(beta)-1)/exp(beta)) + vbeta0)
+    #SE.ExHosp = abs(ExHosp)*SE.log.Exhosp
 
     adj.est <- rbind(adj.est,data.frame(SubCat=subc[i],agegrp="Overall",
 					logPR=beta,
                                         SE=sqrt(vbeta),logPR_ci_lower=beta-1.96*sqrt(vbeta),
-					logPR_ci_upper=beta+1.96*sqrt(vbeta),ExHosp=ExHosp,ExHosp_ci_lower=ExHosp-1.96*SE.ExHosp,
-					ExHosp_ci_upper=ExHosp+1.96*SE.ExHosp))
+					logPR_ci_upper=beta+1.96*sqrt(vbeta),ExEvent=ExHosp,ExEvent_ci_lower=ExHosp-1.96*SE.ExHosp,
+					ExEvent_ci_upper=ExHosp+1.96*SE.ExHosp))
 
   }
-TEvent       <- rbind(TEvent,aggregate(data.all$count,by=list(SubCat=data.all$SubCat,agegrp=data.all$agegrp),sum))
-TEvent.ctl   <- rbind(TEvent.ctl,aggregate(out$count,by=list(SubCat=out$SubCat,agegrp=out$agegrp),sum))
-TEvent.trt   <- rbind(TEvent.trt,aggregate(out2$count,by=list(SubCat=out2$SubCat,agegrp=out2$agegrp),sum))
-volc.df <- adj.est
+TEvent       <- aggregate(data.all$count,by=list(SubCat=data.all$SubCat,agegrp=data.all$agegrp),sum)
+TEvent.ctl   <- aggregate(out$count,by=list(SubCat=out$SubCat,agegrp=out$agegrp),sum)
+TEvent.trt   <- aggregate(out2$count,by=list(SubCat=out2$SubCat,agegrp=out2$agegrp),sum)
+# Overall
+TEvent2       <- aggregate(data.all$count,by=list(SubCat=data.all$SubCat),sum)
+TEvent2       <- data.frame(TEvent2[,-ncol(TEvent2)],agegrp = 'Overall', TEvent2[,ncol(TEvent2)])
+TEvent2.ctl   <- aggregate(out$count,by=list(SubCat=out$SubCat),sum)
+TEvent2.ctl   <- data.frame(TEvent2.ctl[,-ncol(TEvent2.ctl)],agegrp = 'Overall', TEvent2.ctl[,ncol(TEvent2.ctl)])
+TEvent2.trt   <- aggregate(out2$count,by=list(SubCat=out2$SubCat),sum)
+TEvent2.trt   <- data.frame(TEvent2.trt[,-ncol(TEvent2.trt)],agegrp = 'Overall', TEvent2.trt[,ncol(TEvent2.trt)])
 
+# merge
+colnames(TEvent2) <- colnames(TEvent2.ctl) <- colnames(TEvent2.trt) <- colnames(TEvent)
+TEvent        <- rbind(TEvent,TEvent2)
+TEvent.ctl    <- rbind(TEvent.ctl,TEvent2.ctl)
+TEvent.trt    <- rbind(TEvent.trt,TEvent2.trt)
+
+volc.df <- adj.est
 # get Total, Ctl and Treat Events by SubCat and agegrp. This total to be used as size of the dots in volc plot
 volc.df$TEvent <- TEvent$x[match(paste0(volc.df$SubCat,volc.df$agegrp),paste0(TEvent$SubCat,TEvent$agegrp))]
 volc.df$TEvent.ctl  <- TEvent.ctl$x[match(paste0(volc.df$SubCat,volc.df$agegrp),paste0(TEvent.ctl$SubCat,TEvent.ctl$agegrp))]
