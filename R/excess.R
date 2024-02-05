@@ -95,13 +95,23 @@ sheet.trt <- sheet[-grep('Control',sheet)]
   	      (diag(vcov(model.adj))[ncoef-nlev+match(agegroup,lev)])*(match(agegroup,lev)>1)
       covbbeta0 = vcov(model.adj)[1,2] + (vcov(model.adj)[1,1+match(agegroup,lev)] + vcov(model.adj)[2,ncoef-nlev+match(agegroup,lev)] +
 			vcov(model.adj)[ncoef-nlev+match(agegroup,lev),1+match(agegroup,lev)])*(match(agegroup,lev)>1)
+
+      Hosp.ctl <- exp(beta0)*100000 
+      Hosp.trt <- exp(beta+beta0)*100000 
+      SE.log.Hosp.ctl <- sqrt(vbeta0)
+      tmp <- vbeta0+vbeta+2*covbbeta0
+      SE.log.Hosp.trt <- ifelse(tmp<0,sqrt(vbeta0+vbeta),sqrt(tmp)) 
+      SE.Hosp.ctl     <- Hosp.ctl*SE.log.Hosp.ctl
+      SE.Hosp.trt     <- Hosp.trt*SE.log.Hosp.trt
       ExHosp <- (exp(beta)-1)*exp(beta0)*100000
       SE.log.Exhosp=sqrt((exp(beta)/(exp(beta)-1))^2 * (vbeta+2*covbbeta0*(exp(beta)-1)/exp(beta)) + vbeta0)
       SE.ExHosp = abs(ExHosp)*SE.log.Exhosp
             adj.est <- rbind(adj.est,data.frame(SubCat=subc[i],agegrp=agegroup,
-					               logPR=beta,SE=sqrt(vbeta),logPR_ci_lower=beta-1.96*sqrt(vbeta),
-					logPR_ci_upper=beta+1.96*sqrt(vbeta),ExEvent=ExHosp,ExEvent_ci_lower=ExHosp-1.96*SE.ExHosp,
-					ExEvent_ci_upper=ExHosp+1.96*SE.ExHosp))
+				logPR=beta,SE=sqrt(vbeta),logPR_ci_lower=beta-1.96*sqrt(vbeta),
+				logPR_ci_upper=beta+1.96*sqrt(vbeta),ExEvent=ExHosp,ExEvent_ci_lower=ExHosp-1.96*SE.ExHosp,
+				ExEvent_ci_upper=ExHosp+1.96*SE.ExHosp,Event.ctl=Hosp.ctl,Event.ctl_ci_lower=exp(log(Hosp.ctl)-1.96*SE.log.Hosp.ctl),
+				Event.ctl_ci_upper=exp(log(Hosp.ctl)+1.96*SE.log.Hosp.ctl),Event.trt=Hosp.trt,
+				Event.trt_ci_lower=exp(log(Hosp.trt)-1.96*SE.log.Hosp.trt),Event.trt_ci_upper=exp(log(Hosp.trt)+1.96*SE.log.Hosp.trt)))
     }
     # get overall statistic
     data.sub.ctl = subset(data.sub,status=='Control')
@@ -109,10 +119,20 @@ sheet.trt <- sheet[-grep('Control',sheet)]
     virtual.pop$x <- virtual.pop$x/sum(virtual.pop$x)
     virtual.pop <- virtual.pop[match(lev,virtual.pop$agegroup),]
     
-    SE.ExHosp<- sqrt(sum(virtual.pop$x^2*((adj.est$ExEvent_ci_upper[adj.est$SubCat==subc[i]] - adj.est$ExEvent_ci_lower[adj.est$SubCat==subc[i]])/3.92)^2))
-    beta   <- weighted.mean(adj.est$logPR[adj.est$SubCat==subc[i]],w=virtual.pop$x)
-    vbeta  <- sqrt(sum(virtual.pop$x^2 * ((adj.est$logPR_ci_upper[adj.est$SubCat==subc[i]] - adj.est$logPR_ci_lower[adj.est$SubCat==subc[i]])/3.92)^2))
-    ExHosp <- weighted.mean(adj.est$ExEvent[adj.est$SubCat==subc[i]],w=virtual.pop$x)
+    SE.Hosp.ctl<-sqrt(sum(virtual.pop$x^2*((
+			adj.est$Event.ctl_ci_upper[adj.est$SubCat==subc[i]]-adj.est$Event.ctl_ci_lower[adj.est$SubCat==subc[i]])/3.92)^2))
+    Hosp.ctl <- weighted.mean(adj.est$Event.ctl[adj.est$SubCat==subc[i]],w=virtual.pop$x)
+    SE.log.Hosp.ctl <- SE.Hosp.ctl/Hosp.ctl
+
+    SE.Hosp.trt<-sqrt(sum(virtual.pop$x^2*((
+			adj.est$Event.trt_ci_upper[adj.est$SubCat==subc[i]]-adj.est$Event.trt_ci_lower[adj.est$SubCat==subc[i]])/3.92)^2))
+    Hosp.trt <- weighted.mean(adj.est$Event.trt[adj.est$SubCat==subc[i]],w=virtual.pop$x)
+    SE.log.Hosp.trt <- SE.Hosp.trt/Hosp.trt
+
+    beta   <- log(Hosp.trt/Hosp.ctl)
+    vbeta  <- SE.log.Hosp.trt^2 + SE.log.Hosp.ctl^2
+    ExHosp <- Hosp.trt-Hosp.ctl
+    SE.ExHosp<- sqrt(SE.Hosp.trt^2 + SE.Hosp.ctl^2)
 
     #beta0 = summary(model2.adj)$coef[1,1] + (summary(model2.adj)$coef[1+match(agegroup,lev),1])*(match(agegroup,lev)>1)
     #vbeta0=vcov(model2.adj)[1,1]+
@@ -127,10 +147,12 @@ sheet.trt <- sheet[-grep('Control',sheet)]
     #SE.ExHosp = abs(ExHosp)*SE.log.Exhosp
 
     adj.est <- rbind(adj.est,data.frame(SubCat=subc[i],agegrp="Overall",
-					logPR=beta,
-                                        SE=sqrt(vbeta),logPR_ci_lower=beta-1.96*sqrt(vbeta),
-					logPR_ci_upper=beta+1.96*sqrt(vbeta),ExEvent=ExHosp,ExEvent_ci_lower=ExHosp-1.96*SE.ExHosp,
-					ExEvent_ci_upper=ExHosp+1.96*SE.ExHosp))
+				logPR=beta,
+                                SE=sqrt(vbeta),logPR_ci_lower=beta-1.96*sqrt(vbeta),
+				logPR_ci_upper=beta+1.96*sqrt(vbeta),ExEvent=ExHosp,ExEvent_ci_lower=ExHosp-1.96*SE.ExHosp,
+				ExEvent_ci_upper=ExHosp+1.96*SE.ExHosp,Event.ctl=Hosp.ctl,Event.ctl_ci_lower=exp(log(Hosp.ctl)-1.96*SE.log.Hosp.ctl),
+				Event.ctl_ci_upper=exp(log(Hosp.ctl)+1.96*SE.log.Hosp.ctl),Event.trt=Hosp.trt,
+				Event.trt_ci_lower=exp(log(Hosp.trt)-1.96*SE.log.Hosp.trt),Event.trt_ci_upper=exp(log(Hosp.trt)+1.96*SE.log.Hosp.trt)))
 
   }
 TEvent       <- aggregate(data.all$count,by=list(SubCat=data.all$SubCat,agegrp=data.all$agegrp),sum)
