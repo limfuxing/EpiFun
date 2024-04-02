@@ -2,18 +2,18 @@
 % Please edit documentation in R/excess.R
 \name{ENE}
 \alias{ENE}
-\title{Estimate Excess Number of Events in Treatment Group}
+\title{Estimate Condition-Specific Excess Number of Events in Treatment Group}
 \usage{
 ENE(file, reg.model = c("poisson", "NB"), save = TRUE, save.plot = TRUE)
 }
 \arguments{
-\item{file}{path to an Excel file containing the data. The file mus contain multiple sheets with the following sheet naming convention: YYYY_Control containing data for control population in year YYYY and YYYY_Treat containing data for population under treatment. Inside each sheet, the condition name/ID must be specified in the first column and the first row contains variable names. Each row contains data for a condition across different agegroups (from column 2 onwards) with the last row contains the population size to be used as offset in the regression model.}
+\item{file}{path to an Excel file containing the data. The file must contain multiple sheets with the following sheet naming convention: YYYY_Control containing data for control population in year YYYY and YYYY_Treat containing data for population under treatment. Inside each sheet, the condition name/ID must be specified in the first column and the first row contains variable names. Each row contains data for a condition across different agegroups (from column 2 onwards) with the last row contains the population size to be used as offset in the regression model.}
 
 \item{reg.model}{Regression model used to estimate the statistic. The default is Poisson regression with Negative Binomial regression as alternative.}
 
-\item{save}{whether to automatically save the output as a CSV file. If TRUE, output will be saved in analysis_output.csv file under the current working directory.}
+\item{save}{whether to automatically save the output as a CSV file.}
 
-\item{save.plot}{whether to produce volcano plot and save it as a plotly object in an HTML file. If TRUE, a volcano plot will be saved in volcanoplot.HTML under the current working directory.}
+\item{save.plot}{whether to produce volcano plot and save it as a plotly object in an HTML file.}
 }
 \value{
 A table containing the ENE statistic (per 100,000 person-years) for each condition and agegroup.
@@ -27,4 +27,3 @@ This function uses Poisson or Negative Binomial regression to estimate the Exces
 res <- ENE(file="./Baker/Berhanu/temp/Overall(T).xlsx")
 
 }
-

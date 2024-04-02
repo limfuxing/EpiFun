@@ -1,8 +1,8 @@
-#' Estimate Condition-Specific Excess Number of Events in Treatment Group 
+#' Estimate Excess Number of Events in Treatment Group With Condition-Specific Exposure
 #'
 #' This function uses Poisson or Negative Binomial regression to estimate the Excess Number of Events (ENE) per 100,000 person-years. Agegroup-specific and Overall ENE statistic is calculated for each condition.
 #'
-#' @param file path to an Excel file containing the data. The file must contain multiple sheets with the following sheet naming convention: YYYY_Control containing data for control population in year YYYY and YYYY_Treat containing data for population under treatment. Inside each sheet, the condition name/ID must be specified in the first column and the first row contains variable names. Each row contains data for a condition across different agegroups (from column 2 onwards) with the last row contains the population size to be used as offset in the regression model. 
+#' @param file path to an Excel file containing the data. The file must contain multiple sheets with the following sheet naming convention: YYYY_Control_BD containing data for control population in year YYYY and YYYY_Treat_BD containing data for population under treatment. On top of these, the file must also contain the matching exposure that will act as denominator in the regression model. The naming format for these sheets containing exposures are YYYY_Control_AD and YYYY_Treat_AD. Inside each sheet, the condition name/ID must be specified in the first column and the first row contains variable names. Each row contains data for a condition across different agegroups (from column 2 onwards) with the last row contains the population size to be used as offset in the regression model. 
 #' @param reg.model Regression model used to estimate the statistic. The default is Poisson regression with Negative Binomial regression as alternative.
 #' @param save whether to automatically save the output as a CSV file.  
 #' @param save.plot whether to produce volcano plot and save it as a plotly object in an HTML file. 
@@ -12,7 +12,7 @@
 #' @export
 
 
-ENE <- function(file,reg.model=c('poisson','NB'),save=TRUE,save.plot=TRUE) {
+ENE2 <- function(file,reg.model=c('poisson','NB'),save=TRUE,save.plot=TRUE) {
 
 # process and add each file onto data frame and prepare data for volc plot
 volc.df <- NULL
@@ -20,91 +20,128 @@ TEvent   <- TEvent.ctl <- TEvent.trt <- NULL
 adj.est <- NULL
 
 sheet <- sort(openxlsx::getSheetNames(file=file))
+
 # control sheet names
 sheet.ctrl <- sheet[grep('Control',sheet)]
-# treat sheet names
-sheet.trt <- sheet[-grep('Control',sheet)]
+sheet.ctrl.AD <- sheet.ctrl[grep('AD',sheet.ctrl)]
+sheet.ctrl.BD <- sheet.ctrl[grep('BD',sheet.ctrl)]
+
+# Treat sheet names
+sheet.diab <- sheet[-grep('Control',sheet)]
+sheet.diab.AD <- sheet.diab[grep('AD',sheet.diab)]
+sheet.diab.BD <- sheet.diab[grep('BD',sheet.diab)]
+
 # read control sheets
-  out <- NULL
-  for(SH in sheet.ctrl) {
-    tmp=openxlsx::read.xlsx(file,sheet=SH,rowNames=TRUE)
-    Year <- as.numeric(unlist(strsplit(SH,"_"))[1])
-    # get PY 
-    py  = c(tmp[nrow(tmp),])
-    # remove last row (PY)
-    tmp = tmp[-nrow(tmp),]
-    out <-  rbind(out,data.frame(SubCat=rep(substring(rownames(tmp),1,1000),ncol(tmp)),
-		agegrp=rep(colnames(tmp),rep(nrow(tmp),ncol(tmp))),count=c(unlist(tmp)),status=unlist(strsplit(SH,"_"))[2],
-		Year=rep(Year,ncol(tmp)),PY=unlist(rep(py,rep(nrow(tmp),ncol(tmp))))))
-  }
-  
-  # read treat sheets
-  out2 <- NULL
-  for(SH in sheet.trt) {
-    tmp=openxlsx::read.xlsx(file,sheet=SH,rowNames=TRUE)
-    Year <- as.numeric(unlist(strsplit(SH,"_"))[1])
-    # get PY 
-    py  = c(tmp[nrow(tmp),])
-    # remove last row (PY)
-    tmp = tmp[-nrow(tmp),]
-    out2 <- rbind(out2,data.frame(SubCat=rep(substring(rownames(tmp),1,1000),ncol(tmp)),
-		agegrp=rep(colnames(tmp),rep(nrow(tmp),ncol(tmp))),count=c(unlist(tmp)),status=unlist(strsplit(SH,"_"))[2],
-		Year=rep(Year,ncol(tmp)),PY=unlist(rep(py,rep(nrow(tmp),ncol(tmp))))))
-  }
-  
-  # make sure rows are aligned
-  subcat = intersect(unique(out$SubCat),unique(out2$SubCat))
-  out2=out2[out2$SubCat %in% subcat,]
-  out=out[out$SubCat %in% subcat,]
-  # combine treat and controls data
-  data.all <- rbind(out,out2)
+out.AD <- NULL
+for(SH in sheet.ctrl.AD) {
+  tmp=openxlsx::read.xlsx(file,sheet=SH,rowNames=TRUE)
+  Year <- as.numeric(unlist(strsplit(SH,"_"))[1])
+  out.AD<-rbind(out.AD,data.frame(Category=file,SubCat=rep(substring(rownames(tmp),1,1000),ncol(tmp)),agegrp=rep(colnames(tmp),
+		rep(nrow(tmp),ncol(tmp))),count=c(unlist(tmp)),status=unlist(strsplit(SH,"_"))[2],Year=rep(Year,ncol(tmp))))
+}
 
-  # check missing data
-  row.withmiss <- which(is.na(data.all$count) | is.infinite(data.all$count))
-  df.toprint <- data.all[,c('SubCat','agegrp','count','status', 'Year')]
-  if(length(row.withmiss)>0) {
-    print(paste0('The following data may have missing values. Please CHECK your input file!'))
-    rownames(df.toprint) <- NULL
-    print(df.toprint[row.withmiss,])
-  }
+out.BD <- NULL
+for(SH in sheet.ctrl.BD) {
+  tmp=openxlsx::read.xlsx(file,sheet=SH,rowNames=TRUE)
+  Year <- as.numeric(unlist(strsplit(SH,"_"))[1])
+  out.BD <-  rbind(out.BD,data.frame(Category=file,SubCat=rep(substring(rownames(tmp),1,1000),ncol(tmp)),agegrp=rep(colnames(tmp),
+		rep(nrow(tmp),ncol(tmp))),count=c(unlist(tmp)),status=unlist(strsplit(SH,"_"))[2],Year=rep(Year,ncol(tmp))))
+}
+  
+# read treat sheets
+out2.AD <- NULL
+for(SH in sheet.diab.AD) {
+  tmp=openxlsx::read.xlsx(file,sheet=SH,rowNames=TRUE)
+  Year <- as.numeric(unlist(strsplit(SH,"_"))[1])
+  out2.AD <-  rbind(out2.AD,data.frame(Category=file,SubCat=rep(substring(rownames(tmp),1,1000),ncol(tmp)),agegrp=rep(colnames(tmp),
+		rep(nrow(tmp),ncol(tmp))),count=c(unlist(tmp)),status=unlist(strsplit(SH,"_"))[2],Year=rep(Year,ncol(tmp))))
+}
 
-  # fit model for each condition and calculate statistic
-  subc <- unique(data.all$SubCat)
-  agegroup <- unique(data.all$agegrp)
-  for(i in 1:length(subc)) {
-    data.sub  <- data.all[data.all$SubCat==subc[i],]
-    data.sub$Year <- factor(data.sub$Year)
-    data.sub$agegrp <- factor(data.sub$agegrp)
-    contrasts(data.sub$Year) <- contr.sum
+out2.BD <- NULL
+for(SH in sheet.diab.BD) {
+  tmp=openxlsx::read.xlsx(file,sheet=SH,rowNames=TRUE)
+  Year <- as.numeric(unlist(strsplit(SH,"_"))[1])
+  out2.BD <-  rbind(out2.BD,data.frame(Category=file,SubCat=rep(substring(rownames(tmp),1,1000),ncol(tmp)),agegrp=rep(colnames(tmp),
+		rep(nrow(tmp),ncol(tmp))),count=c(unlist(tmp)),status=unlist(strsplit(SH,"_"))[2],Year=rep(Year,ncol(tmp))))
+}
+
+# make sure rows are aligned
+subcat = intersect(intersect(unique(out.AD$SubCat),unique(out.BD$SubCat)),intersect(unique(out2.AD$SubCat),unique(out2.BD$SubCat)))
+out2.AD=out2.AD[out2.AD$SubCat %in% subcat,]
+out2.BD=out2.BD[out2.BD$SubCat %in% subcat,]
+out.AD=out.AD[out.AD$SubCat %in% subcat,]
+out.BD=out.BD[out.BD$SubCat %in% subcat,]
+
+# combine cases (DM) and controls (non-DM)
+data.AD <- rbind(out.AD,out2.AD)
+data.BD <- rbind(out.AD,out2.BD)
+data.BD <- subset(data.BD, data.AD$count>0)
+data.AD <- subset(data.AD, data.AD$count>0)
+
+
+# check missing data
+row.withmiss.BD <- which(is.na(data.BD$count) | is.infinite(data.BD$count))
+df.toprint <- data.BD[,c('SubCat','agegrp','count','status', 'Year')]
+row.withmiss.AD <- which(is.na(data.AD$count) | is.infinite(data.AD$count))
+df2.toprint <- data.AD[,c('SubCat','agegrp','count','status', 'Year')]
+
+if(length(row.withmiss.BD)>0) {
+  print(paste0('The following data may have missing values. Please CHECK your input file!'))
+  rownames(df.toprint) <- NULL
+  print(df.toprint[row.withmiss.BD,])
+}
+
+if(length(row.withmiss.AD)>0) {
+  print(paste0('The following EXPOSURE data may have missing values. Please CHECK your input file!'))
+  rownames(df2.toprint) <- NULL
+  print(df2.toprint[row.withmiss.AD,])
+}
+
+# fit model for each condition and calculate statistic
+subc <- unique(data.BD$SubCat)
+agegroup <- unique(data.BD$agegrp)
+for(i in 1:length(subc)) {
+    data.sub.AD <- subset(data.AD,SubCat==subc[i])
+    data.sub.BD <- subset(data.BD,SubCat==subc[i])
+    data.sub.BD$Year <- factor(data.sub.BD$Year)
+    data.sub.BD$agegrp <- factor(data.sub.BD$agegrp)
+    contrasts(data.sub.BD$Year) <- contr.sum
+    PY <- data.sub.AD$count
     # model for agegroup-specific estimate
     if(reg.model[1]=='poisson')
-     model.adj   <- glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub)
+     model.adj   <- glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub.BD)
     if(reg.model[1]=='NB') {
-     model.adj   <- tryCatch({MASS::glm.nb(count~status*agegrp+Year+offset(log(PY)),data=data.sub)}, error = function(e) 
-			{glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub)})
+     model.adj   <- tryCatch({MASS::glm.nb(count~status*agegrp+Year+offset(log(PY)),data=data.sub.BD)}, error = function(e) 
+			{glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub.BD)})
     }
     # model for overall estimate
-    contrasts(data.sub$agegrp) <- contr.sum
-    X  <- model.matrix(~status*agegrp+Year,contr.arg=list(agegrp='contr.sum',Year='contr.sum'),data=data.sub)
+    contrasts(data.sub.BD$agegrp) <- contr.sum
+    X  <- model.matrix(~status*agegrp+Year,contr.arg=list(agegrp='contr.sum',Year='contr.sum'),data=data.sub.BD)
     if(reg.model[1]=='poisson')
-     model2.adj   <- glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub)
+     model2.adj   <- glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub.BD)
     if(reg.model[1]=='NB') {
-     model2.adj   <- tryCatch({MASS::glm.nb(count~X[,-1]+offset(log(PY)),data=data.sub)}, error = function(e) 
-			{glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub)})
+     model2.adj   <- tryCatch({MASS::glm.nb(count~X[,-1]+offset(log(PY)),data=data.sub.BD)}, error = function(e) 
+			{glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub.BD)})
     }
     # start calculating agegroup-specific statistics
-    lev <- levels(data.sub$agegrp)
+    lev <- levels(data.sub.BD$agegrp)
     nlev <- length(lev)
     ncoef<- length(coef(model.adj))
     for(agegroup in lev) {
-      beta0 = summary(model.adj)$coef[1,1] + (summary(model.adj)$coef[1+match(agegroup,lev),1])*(match(agegroup,lev)>1)
-      vbeta0=vcov(model.adj)[1,1]+
+      beta0 = model.adj$coef[1] + (model.adj$coef[1+match(agegroup,lev)])*(match(agegroup,lev)>1)
+      beta = model.adj$coef[2]  + (model.adj$coef[ncoef-nlev+match(agegroup,lev)])*(match(agegroup,lev)>1)
+      if(ncol(vcov(model.adj)) >= (ncoef-nlev+match(agegroup,lev)) ) {
+        vbeta0=vcov(model.adj)[1,1]+
   	      (vcov(model.adj)[1+match(agegroup,lev),1+match(agegroup,lev)] + 2*vcov(model.adj)[1,1+match(agegroup,lev)])*(match(agegroup,lev)>1)
-      beta = summary(model.adj)$coef[2,1]  + (summary(model.adj)$coef[ncoef-nlev+match(agegroup,lev),1])*(match(agegroup,lev)>1)
-      vbeta = diag(vcov(model.adj))[2] +
+        vbeta = diag(vcov(model.adj))[2] +
   	      (diag(vcov(model.adj))[ncoef-nlev+match(agegroup,lev)])*(match(agegroup,lev)>1)
-      covbbeta0 = vcov(model.adj)[1,2] + (vcov(model.adj)[1,1+match(agegroup,lev)] + vcov(model.adj)[2,ncoef-nlev+match(agegroup,lev)] +
+        covbbeta0 = vcov(model.adj)[1,2] + (vcov(model.adj)[1,1+match(agegroup,lev)] + vcov(model.adj)[2,ncoef-nlev+match(agegroup,lev)] +
 			vcov(model.adj)[ncoef-nlev+match(agegroup,lev),1+match(agegroup,lev)])*(match(agegroup,lev)>1)
+      }
+
+      if(ncol(vcov(model.adj)) < (ncoef-nlev+match(agegroup,lev)) ) {
+       vbeta0 <- vbeta <- covbbeta0 <- NA
+      }
 
       Hosp.ctl <- exp(beta0)*100000 
       Hosp.trt <- exp(beta+beta0)*100000 
@@ -137,8 +174,8 @@ sheet.trt <- sheet[-grep('Control',sheet)]
     adj.est$Event.trt_ci_upper[adj.est$Event.trt<0.1 & adj.est$SubCat==subc[i]] <- 1
 
     # get overall statistic
-    data.sub.ctl = subset(data.sub,status=='Control')
-    virtual.pop <- aggregate(data.sub.ctl$PY,by=list(agegroup=data.sub.ctl$agegrp),sum)
+    data.sub.ctl = subset(data.sub.AD,status=='Control')
+    virtual.pop <- aggregate(data.sub.ctl$count,by=list(agegroup=data.sub.ctl$agegrp),sum)
     virtual.pop$x <- virtual.pop$x/sum(virtual.pop$x)
     virtual.pop <- virtual.pop[match(lev,virtual.pop$agegroup),]
     
@@ -184,15 +221,15 @@ sheet.trt <- sheet[-grep('Control',sheet)]
   adj.est$Event.ctl_ci_upper[is.infinite(adj.est$Event.ctl_ci_upper)] <- sqrt(.Machine$double.xmax)
   adj.est$Event.trt_ci_upper[is.infinite(adj.est$Event.trt_ci_upper)] <- sqrt(.Machine$double.xmax)
 
-TEvent       <- aggregate(data.all$count,by=list(SubCat=data.all$SubCat,agegrp=data.all$agegrp),sum)
-TEvent.ctl   <- aggregate(out$count,by=list(SubCat=out$SubCat,agegrp=out$agegrp),sum)
-TEvent.trt   <- aggregate(out2$count,by=list(SubCat=out2$SubCat,agegrp=out2$agegrp),sum)
+TEvent       <- aggregate(data.BD$count,by=list(SubCat=data.BD$SubCat,agegrp=data.BD$agegrp),sum)
+TEvent.ctl   <- aggregate(out.BD$count,by=list(SubCat=out.BD$SubCat,agegrp=out.BD$agegrp),sum)
+TEvent.trt   <- aggregate(out2.BD$count,by=list(SubCat=out2.BD$SubCat,agegrp=out2.BD$agegrp),sum)
 # Overall
-TEvent2       <- aggregate(data.all$count,by=list(SubCat=data.all$SubCat),sum)
+TEvent2       <- aggregate(data.BD$count,by=list(SubCat=data.BD$SubCat),sum)
 TEvent2       <- data.frame(TEvent2[,-ncol(TEvent2)],agegrp = 'Overall', TEvent2[,ncol(TEvent2)])
-TEvent2.ctl   <- aggregate(out$count,by=list(SubCat=out$SubCat),sum)
+TEvent2.ctl   <- aggregate(out.BD$count,by=list(SubCat=out.BD$SubCat),sum)
 TEvent2.ctl   <- data.frame(TEvent2.ctl[,-ncol(TEvent2.ctl)],agegrp = 'Overall', TEvent2.ctl[,ncol(TEvent2.ctl)])
-TEvent2.trt   <- aggregate(out2$count,by=list(SubCat=out2$SubCat),sum)
+TEvent2.trt   <- aggregate(out2.BD$count,by=list(SubCat=out2.BD$SubCat),sum)
 TEvent2.trt   <- data.frame(TEvent2.trt[,-ncol(TEvent2.trt)],agegrp = 'Overall', TEvent2.trt[,ncol(TEvent2.trt)])
 
 # merge
