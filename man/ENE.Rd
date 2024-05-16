@@ -17,7 +17,7 @@ ENE(
 
 \item{reg.model}{Regression model used to estimate the statistic. The default is Poisson regression with Negative Binomial regression as alternative.}
 
-\item{wt.type}{Which population to use for calculating the 'Overall' Excess estimate as weighted average of the the age-specific Excess estimate.}
+\item{wt.type}{Which population to use for calculating the 'Overall' Excess estimate as weighted average of the the age-specific Excess estimate. The default is to weigh using the treated (exposed) population. This gives a realistic assessment of the disease burden and spread for the exposed population, and also allows comparisons between the exposed and general populations, accounting for differences in age, so can be interpreted as the effect of exposures if the general population had the same age structure as the population with exposure.}
 
 \item{save}{whether to automatically save the output as a CSV file.}
 
@@ -35,3 +35,4 @@ This function uses Poisson or Negative Binomial regression to estimate the Exces
 res <- ENE(file="./Baker/Berhanu/temp/Overall(T).xlsx")
 
 }
+
