@@ -4,6 +4,7 @@
 #'
 #' @param file path to an Excel file containing the data. The file must contain multiple sheets with the following sheet naming convention: YYYY_Control containing data for control population in year YYYY and YYYY_Treat containing data for population under treatment. Inside each sheet, the condition name/ID must be specified in the first column and the first row contains variable names. Each row contains data for a condition across different agegroups (from column 2 onwards) with the last row contains the population size to be used as offset in the regression model. 
 #' @param reg.model Regression model used to estimate the statistic. The default is Poisson regression with Negative Binomial regression as alternative.
+#' @param wt.type Which population to use for calculating the 'Overall' Excess estimate as weighted average of the the age-specific Excess estimate.  
 #' @param save whether to automatically save the output as a CSV file.  
 #' @param save.plot whether to produce volcano plot and save it as a plotly object in an HTML file. 
 
@@ -12,7 +13,7 @@
 #' @export
 
 
-ENE <- function(file,reg.model=c('poisson','NB'),save=TRUE,save.plot=TRUE) {
+ENE <- function(file,reg.model=c('poisson','NB'),wt.type='treat',save=TRUE,save.plot=TRUE) {
 
 # process and add each file onto data frame and prepare data for volc plot
 volc.df <- NULL
@@ -137,7 +138,11 @@ sheet.trt <- sheet[-grep('Control',sheet)]
     adj.est$Event.trt_ci_upper[adj.est$Event.trt<0.1 & adj.est$SubCat==subc[i]] <- 1
 
     # get overall statistic
-    data.sub.ctl = subset(data.sub,status=='Control')
+    if(wt.type=='treat')
+     data.sub.ctl = subset(data.sub,status!='Control')
+    if(wt.type!='treat')
+     data.sub.ctl = subset(data.sub,status=='Control')
+
     virtual.pop <- aggregate(data.sub.ctl$PY,by=list(agegroup=data.sub.ctl$agegrp),sum)
     virtual.pop$x <- virtual.pop$x/sum(virtual.pop$x)
     virtual.pop <- virtual.pop[match(lev,virtual.pop$agegroup),]

@@ -4,12 +4,20 @@
 \alias{ENE}
 \title{Estimate Condition-Specific Excess Number of Events in Treatment Group}
 \usage{
-ENE(file, reg.model = c("poisson", "NB"), save = TRUE, save.plot = TRUE)
+ENE(
+  file,
+  reg.model = c("poisson", "NB"),
+  wt.type = "treat",
+  save = TRUE,
+  save.plot = TRUE
+)
 }
 \arguments{
 \item{file}{path to an Excel file containing the data. The file must contain multiple sheets with the following sheet naming convention: YYYY_Control containing data for control population in year YYYY and YYYY_Treat containing data for population under treatment. Inside each sheet, the condition name/ID must be specified in the first column and the first row contains variable names. Each row contains data for a condition across different agegroups (from column 2 onwards) with the last row contains the population size to be used as offset in the regression model.}
 
 \item{reg.model}{Regression model used to estimate the statistic. The default is Poisson regression with Negative Binomial regression as alternative.}
+
+\item{wt.type}{Which population to use for calculating the 'Overall' Excess estimate as weighted average of the the age-specific Excess estimate.}
 
 \item{save}{whether to automatically save the output as a CSV file.}
 
