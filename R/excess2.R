@@ -135,8 +135,8 @@ for(i in 1:length(subc)) {
         vbeta0=vcov(model.adj)[1,1]+
   	      (vcov(model.adj)[1+match(agegroup,lev),1+match(agegroup,lev)] + 2*vcov(model.adj)[1,1+match(agegroup,lev)])*(match(agegroup,lev)>1)
         vbeta = diag(vcov(model.adj))[2] +
-  	      (diag(vcov(model.adj))[ncoef-nlev+match(agegroup,lev)])*(match(agegroup,lev)>1)
-        covbbeta0 = vcov(model.adj)[1,2] + (vcov(model.adj)[1,1+match(agegroup,lev)] + vcov(model.adj)[2,ncoef-nlev+match(agegroup,lev)] +
+  	      (diag(vcov(model.adj))[ncoef-nlev+match(agegroup,lev)] + 2*vcov(model.adj)[2,ncoef-nlev+match(agegroup,lev)])*(match(agegroup,lev)>1) 
+        covbbeta0 = vcov(model.adj)[1,2] + (vcov(model.adj)[2,1+match(agegroup,lev)] + vcov(model.adj)[1,ncoef-nlev+match(agegroup,lev)] +
 			vcov(model.adj)[ncoef-nlev+match(agegroup,lev),1+match(agegroup,lev)])*(match(agegroup,lev)>1)
       }
 
@@ -148,15 +148,15 @@ for(i in 1:length(subc)) {
       Hosp.trt <- exp(beta+beta0)*100000 
       SE.log.Hosp.ctl <- sqrt(vbeta0)
       tmp <- vbeta0+vbeta+2*covbbeta0
-      SE.log.Hosp.trt <- ifelse(tmp<0,sqrt(abs(tmp)),sqrt(tmp)) 
+      SE.log.Hosp.trt <- sqrt(tmp)
       SE.Hosp.ctl     <- Hosp.ctl*SE.log.Hosp.ctl
       SE.Hosp.trt     <- Hosp.trt*SE.log.Hosp.trt
       ExHosp <- (exp(beta)-1)*exp(beta0)*100000
       #SE.log.Exhosp=sqrt((exp(beta)/(exp(beta)-1))^2 * (vbeta+2*covbbeta0*(exp(beta)-1)/exp(beta)) + vbeta0)
       #SE.ExHosp = abs(ExHosp)*SE.log.Exhosp
       var.ExHosp <- (exp(beta+beta0)^2*tmp + exp(beta0)^2*vbeta0 - 2*exp(beta+beta0)*exp(beta0)*(covbbeta0 + vbeta0))*100000^2
-      var2.ExHosp <- (exp(beta+beta0)^2*(vbeta0+vbeta) + exp(beta0)^2*vbeta0)*100000^2
-      SE.ExHosp  <- ifelse(var.ExHosp>0,sqrt(var.ExHosp),sqrt(var2.ExHosp))
+      #var2.ExHosp <- (exp(beta+beta0)^2*(vbeta0+vbeta) + exp(beta0)^2*vbeta0)*100000^2
+      SE.ExHosp  <- sqrt(var.ExHosp)
       
             adj.est <- rbind(adj.est,data.frame(SubCat=subc[i],agegrp=agegroup,
 				logPR=beta,SE=sqrt(vbeta),logPR_ci_lower=beta-1.96*sqrt(vbeta),
