@@ -5,6 +5,7 @@
 #' @param file path to an Excel file containing the data. The file must contain multiple sheets with the following sheet naming convention: YYYY_Control_BD containing data for control population in year YYYY and YYYY_Treat_BD containing data for population under treatment. On top of these, the file must also contain the matching exposure that will act as denominator in the regression model. The naming format for these sheets containing exposures are YYYY_Control_AD and YYYY_Treat_AD. Inside each sheet, the condition name/ID must be specified in the first column and the first row contains variable names. Each row contains data for a condition across different agegroups (from column 2 onwards) with the last row contains the population size to be used as offset in the regression model. 
 #' @param reg.model Regression model used to estimate the statistic. The default is Poisson regression with Negative Binomial regression as alternative.
 #' @param wt.type Which population to use for calculating the 'Overall' Excess estimate as weighted average of the the age-specific Excess estimate. The default is to weigh using the treated (exposed) population. This gives a realistic assessment of the disease burden and spread for the exposed population, and also allows comparisons between the exposed and general populations, accounting for differences in age, so can be interpreted as the effect of exposures if the general population had the same age structure as the population with exposure.  
+#' @param wt.var weighting variable to estimate overall effect combining age-specific effect (must be ordered according to age-category). If specified, it will override wt.type specification.
 #' @param save whether to automatically save the output as a CSV file.  
 #' @param save.plot whether to produce volcano plot and save it as a plotly object in an HTML file. 
 
@@ -13,7 +14,7 @@
 #' @export
 
 
-ENE2 <- function(file,reg.model=c('poisson','NB'),wt.type='treat',save=TRUE,save.plot=TRUE) {
+ENE2 <- function(file,reg.model=c('poisson','NB'),wt.type='treat',wt.var=NULL,save=TRUE,save.plot=TRUE) {
 
 # process and add each file onto data frame and prepare data for volc plot
 volc.df <- NULL
@@ -172,25 +173,31 @@ for(i in 1:length(subc)) {
     adj.est$Event.trt_ci_upper[adj.est$Event.trt<0.1 & adj.est$SubCat==subc[i]] <- 1
 
     # get overall statistic
-    if(wt.type=='treat')
+    if(is.null(wt.var)) {
+     if(wt.type=='treat')
        data.sub.ctl = subset(data.sub.AD,status!='Control')
-    if(wt.type!='treat')
+     if(wt.type!='treat')
        data.sub.ctl = subset(data.sub.AD,status=='Control')
-
+    
     virtual.pop <- aggregate(data.sub.ctl$count,by=list(agegroup=data.sub.ctl$agegrp),sum)
     virtual.pop$x <- virtual.pop$x/sum(virtual.pop$x)
     virtual.pop <- virtual.pop[match(lev,virtual.pop$agegroup),]
+    }
     
+    if(!is.null(wt.var)) {
+      virtual.pop <- data.frame(x=wt.var[match(lev,names(wt.var))])
+    }
+ 
     interval   <- adj.est$Event.ctl_ci_upper[adj.est$SubCat==subc[i]]-adj.est$Event.ctl_ci_lower[adj.est$SubCat==subc[i]]
     interval   <- ifelse(interval>sqrt(.Machine$double.xmax),sqrt(.Machine$double.xmax),interval)
     SE.Hosp.ctl<-sqrt(sum(virtual.pop$x^2*(interval/3.92)^2))
     SE.Hosp.ctl<-ifelse(SE.Hosp.ctl> sqrt(.Machine$double.xmax), sqrt(.Machine$double.xmax), SE.Hosp.ctl)
-    Hosp.ctl <- weighted.mean(adj.est$Event.ctl[adj.est$SubCat==subc[i]],w=virtual.pop$x)
+    Hosp.ctl <- exp(weighted.mean(log(adj.est$Event.ctl[adj.est$SubCat==subc[i]]),w=virtual.pop$x))
     SE.log.Hosp.ctl <- SE.Hosp.ctl/Hosp.ctl
     interval   <- adj.est$Event.trt_ci_upper[adj.est$SubCat==subc[i]]-adj.est$Event.trt_ci_lower[adj.est$SubCat==subc[i]]
     SE.Hosp.trt<-sqrt(sum(virtual.pop$x^2*(interval/3.92)^2))
     SE.Hosp.trt<-ifelse(SE.Hosp.trt> sqrt(.Machine$double.xmax), sqrt(.Machine$double.xmax), SE.Hosp.trt)
-    Hosp.trt <- weighted.mean(adj.est$Event.trt[adj.est$SubCat==subc[i]],w=virtual.pop$x)
+    Hosp.trt <- exp(weighted.mean(log(adj.est$Event.trt[adj.est$SubCat==subc[i]]),w=virtual.pop$x))
     SE.log.Hosp.trt <- SE.Hosp.trt/Hosp.trt
 
     beta   <- log(Hosp.trt/Hosp.ctl)

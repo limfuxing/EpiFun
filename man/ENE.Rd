@@ -29,10 +29,3 @@ A table containing the ENE statistic (per 100,000 person-years) for each conditi
 \description{
 This function uses Poisson or Negative Binomial regression to estimate the Excess Number of Events (ENE) per 100,000 person-years. Agegroup-specific and Overall ENE statistic is calculated for each condition.
 }
-
-\examples{
-
-res <- ENE(file="./Baker/Berhanu/temp/Overall(T).xlsx")
-
-}
-

@@ -12,8 +12,8 @@ censGamma.glm <- function(formula,data=NULL) {
   y     <- xy[,1]
   cens  <- y==max(y)
   X     <- as.matrix(xy[,-1])
-  
-  p.init <- c(lm(log(y)~X[,-1])$coef,0)
+  fit   <- glm(y~X[,-1],family=Gamma(link='log'))
+  p.init <- c(fit$coef,-log(sum(fit$residuals^2)/fit$df.r))
 
   #nlog-likelihood
   gammacens.nlogl <- function(p,y,X,cens) {
@@ -29,14 +29,14 @@ censGamma.glm <- function(formula,data=NULL) {
   table$z<- table$est/table$SE
   table$pvalue <- 2*pnorm(abs(table$z),lower.tail=FALSE)
   rownames(table) <- c('intercept',colnames(X)[-1],'log(scale) parameter')
-
+  print(paste0('log-likelihood at final solution=',-out$v, ' and ', ifelse(out$conv==0,'converged','not-converged')))
   table
 }
 
 # simulate data
 x <- rnorm(1000)
 z <- rnorm(1000)
-y <- rgamma(1000,shape=exp(0.5+0.2*x)/2,scale=2)
+y <- rgamma(1000,shape=exp(0.5+0.2*x-0.2*z)/2,scale=2)
 
 # censor anything above 5
 y[y>5] <- 5

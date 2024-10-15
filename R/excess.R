@@ -152,12 +152,12 @@ sheet.trt <- sheet[-grep('Control',sheet)]
     interval   <- ifelse(interval>sqrt(.Machine$double.xmax),sqrt(.Machine$double.xmax),interval)
     SE.Hosp.ctl<-sqrt(sum(virtual.pop$x^2*(interval/3.92)^2))
     SE.Hosp.ctl<-ifelse(SE.Hosp.ctl> sqrt(.Machine$double.xmax), sqrt(.Machine$double.xmax), SE.Hosp.ctl)
-    Hosp.ctl <- weighted.mean(adj.est$Event.ctl[adj.est$SubCat==subc[i]],w=virtual.pop$x)
+    Hosp.ctl <- exp(weighted.mean(log(adj.est$Event.ctl[adj.est$SubCat==subc[i]]),w=virtual.pop$x))
     SE.log.Hosp.ctl <- SE.Hosp.ctl/Hosp.ctl
     interval   <- adj.est$Event.trt_ci_upper[adj.est$SubCat==subc[i]]-adj.est$Event.trt_ci_lower[adj.est$SubCat==subc[i]]
     SE.Hosp.trt<-sqrt(sum(virtual.pop$x^2*(interval/3.92)^2))
     SE.Hosp.trt<-ifelse(SE.Hosp.trt> sqrt(.Machine$double.xmax), sqrt(.Machine$double.xmax), SE.Hosp.trt)
-    Hosp.trt <- weighted.mean(adj.est$Event.trt[adj.est$SubCat==subc[i]],w=virtual.pop$x)
+    Hosp.trt <- exp(weighted.mean(log(adj.est$Event.trt[adj.est$SubCat==subc[i]]),w=virtual.pop$x))
     SE.log.Hosp.trt <- SE.Hosp.trt/Hosp.trt
 
     beta   <- log(Hosp.trt/Hosp.ctl)
