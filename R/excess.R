@@ -13,7 +13,7 @@
 #' @export
 
 
-ENE <- function(file,reg.model=c('poisson','NB'),wt.type='treat',save=TRUE,save.plot=TRUE) {
+ENE <- function(file,reg.model=c('poisson','NB','quasipoisson'),wt.type='treat',save=TRUE,save.plot=TRUE) {
 
 # process and add each file onto data frame and prepare data for volc plot
 volc.df <- NULL
@@ -80,19 +80,63 @@ sheet.trt <- sheet[-grep('Control',sheet)]
     # model for agegroup-specific estimate
     if(reg.model[1]=='poisson')
      model.adj   <- glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub)
+
+    if(reg.model[1]=='quasipoisson')
+     model.adj   <- glm(count~status*agegrp+Year+offset(log(PY)),family='quasipoisson',data=data.sub)
+
     if(reg.model[1]=='NB') {
-     model.adj   <- tryCatch({MASS::glm.nb(count~status*agegrp+Year+offset(log(PY)),data=data.sub)}, error = function(e) 
-			{glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub)})
+     model.adj   <- tryCatch({MASS::glm.nb(count~status*agegrp+Year+offset(log(PY)),data=data.sub, 
+			control=glm.control(maxit=100,epsilon=1e-06))}, 
+			error = function(e) {glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub)})
+
+     # if Hessian is non positive definite, relax convergenc criterion 
+     npdef <- det(vcov(model.adj))<=0 | !model.adj$conv | min(eigen(vcov(model.adj))$value)<=0
+     if(npdef) {
+       model.adj   <- tryCatch({MASS::glm.nb(count~status*agegrp+Year+offset(log(PY)),data=data.sub, control=glm.control(epsilon=1e-04))}, 
+		error = function(e) {glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub)})
+     }
+     npdef <- det(vcov(model.adj))<=0 | !model.adj$conv | min(eigen(vcov(model.adj))$value)<=0
+     if(npdef) {
+       model.adj   <- tryCatch({MASS::glm.nb(count~status*agegrp+Year+offset(log(PY)),data=data.sub, control=glm.control(epsilon=1e-02))}, 
+		error = function(e) {glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub)})
+     }
+     # revert to Poisson if it's still problematic
+     npdef <- det(vcov(model.adj))<=0 | !model.adj$conv | min(eigen(vcov(model.adj))$value)<=0
+     if(npdef) {
+        model.adj   <- glm(count~status*agegrp+Year+offset(log(PY)),family='poisson',data=data.sub)
+     }
     }
     # model for overall estimate
     contrasts(data.sub$agegrp) <- contr.sum
     X  <- model.matrix(~status*agegrp+Year,contr.arg=list(agegrp='contr.sum',Year='contr.sum'),data=data.sub)
     if(reg.model[1]=='poisson')
      model2.adj   <- glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub)
+
+    if(reg.model[1]=='quasipoisson')
+     model2.adj   <- glm(count~X[,-1]+offset(log(PY)),family='quasipoisson',data=data.sub)
+
     if(reg.model[1]=='NB') {
-     model2.adj   <- tryCatch({MASS::glm.nb(count~X[,-1]+offset(log(PY)),data=data.sub)}, error = function(e) 
-			{glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub)})
+     model2.adj   <- tryCatch({MASS::glm.nb(count~X[,-1]+offset(log(PY)),data=data.sub, control=glm.control(maxit=100,epsilon=1e-06))}, 
+			error = function(e) {glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub)})
+     # if Hessian is non positive definite, relax convergenc criterion 
+     npdef <- det(vcov(model2.adj))<=0 | !model2.adj$conv | min(eigen(vcov(model2.adj))$value)<=0
+     if(npdef) {
+        model2.adj   <- tryCatch({MASS::glm.nb(count~X[,-1]+offset(log(PY)),data=data.sub, control=glm.control(epsilon=1e-04))}, 
+			error = function(e) {glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub)})
+     }
+     npdef <- det(vcov(model2.adj))<=0 | !model2.adj$conv | min(eigen(vcov(model2.adj))$value)<=0
+     if(npdef) {
+        model2.adj   <- tryCatch({MASS::glm.nb(count~X[,-1]+offset(log(PY)),data=data.sub, control=glm.control(epsilon=1e-02))}, 
+			error = function(e) {glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub)})
+     }
+
+     # revert to Poisson if it's still problematic
+     npdef <- det(vcov(model2.adj))<=0 | !model2.adj$conv | min(eigen(vcov(model2.adj))$value)<=0
+     if(npdef) {
+	model2.adj   <- glm(count~X[,-1]+offset(log(PY)),family='poisson',data=data.sub)
+     }
     }
+
     # start calculating agegroup-specific statistics
     lev <- levels(data.sub$agegrp)
     nlev <- length(lev)
@@ -130,13 +174,19 @@ sheet.trt <- sheet[-grep('Control',sheet)]
 				Event.trt_ci_lower=exp(log(Hosp.trt)-1.96*SE.log.Hosp.trt),Event.trt_ci_upper=exp(log(Hosp.trt)+1.96*SE.log.Hosp.trt)))
     }
     # fixed CI with missing/infinite values
-    adj.est$Event.ctl_ci_lower[(is.na(adj.est$Event.ctl_ci_lower) | is.infinite(adj.est$Event.ctl_ci_lower)) & adj.est$SubCat==subc[i]] <- 0
-    adj.est$Event.ctl_ci_upper[(is.na(adj.est$Event.ctl_ci_upper) | is.infinite(adj.est$Event.ctl_ci_upper)) & adj.est$SubCat==subc[i]] <- 1
-    adj.est$Event.trt_ci_lower[(is.na(adj.est$Event.trt_ci_lower) | is.infinite(adj.est$Event.trt_ci_lower)) & adj.est$SubCat==subc[i]] <- 0
-    adj.est$Event.trt_ci_upper[(is.na(adj.est$Event.trt_ci_upper) | is.infinite(adj.est$Event.trt_ci_upper)) & adj.est$SubCat==subc[i]] <- 1
-    # those with very small event rates, fixed upper CI at 1
-    adj.est$Event.ctl_ci_upper[adj.est$Event.ctl<0.1 & adj.est$SubCat==subc[i]] <- 1
-    adj.est$Event.trt_ci_upper[adj.est$Event.trt<0.1 & adj.est$SubCat==subc[i]] <- 1
+  adj.est$Event.ctl_ci_lower[(is.na(adj.est$Event.ctl_ci_lower) | is.infinite(adj.est$Event.ctl_ci_lower)) & adj.est$SubCat==subc[i]]<-0.01 
+  adj.est$Event.ctl_ci_upper[(is.na(adj.est$Event.ctl_ci_upper) | is.infinite(adj.est$Event.ctl_ci_upper)) & adj.est$SubCat==subc[i]] <- 1
+  adj.est$Event.trt_ci_lower[(is.na(adj.est$Event.trt_ci_lower) | is.infinite(adj.est$Event.trt_ci_lower)) & adj.est$SubCat==subc[i]] <-0.01
+  adj.est$Event.trt_ci_upper[(is.na(adj.est$Event.trt_ci_upper) | is.infinite(adj.est$Event.trt_ci_upper)) & adj.est$SubCat==subc[i]] <- 1
+  # those with very small event rates, fixed upper CI at 1
+  adj.est$Event.ctl_ci_upper[adj.est$Event.ctl<0.1 & adj.est$SubCat==subc[i]] <- 1
+  adj.est$Event.trt_ci_upper[adj.est$Event.trt<0.1 & adj.est$SubCat==subc[i]] <- 1
+  # those with very small event rates, fixed lower CI at 0.01
+  adj.est$Event.ctl_ci_lower[adj.est$Event.ctl<0.1 & adj.est$SubCat==subc[i]] <- 0.01
+  adj.est$Event.trt_ci_lower[adj.est$Event.trt<0.1 & adj.est$SubCat==subc[i]] <- 0.01
+  # those with very small event rates, fixed estimate at 0.05
+  adj.est$Event.ctl[adj.est$Event.ctl<0.1 & adj.est$SubCat==subc[i]] <- 0.05
+  adj.est$Event.trt[adj.est$Event.trt<0.1 & adj.est$SubCat==subc[i]] <- 0.05
 
     # get overall statistic
     if(wt.type=='treat')
@@ -148,17 +198,19 @@ sheet.trt <- sheet[-grep('Control',sheet)]
     virtual.pop$x <- virtual.pop$x/sum(virtual.pop$x)
     virtual.pop <- virtual.pop[match(lev,virtual.pop$agegroup),]
     
-    interval   <- adj.est$Event.ctl_ci_upper[adj.est$SubCat==subc[i]]-adj.est$Event.ctl_ci_lower[adj.est$SubCat==subc[i]]
+    interval   <- log(adj.est$Event.ctl_ci_upper[adj.est$SubCat==subc[i]]/adj.est$Event.ctl_ci_lower[adj.est$SubCat==subc[i]])
     interval   <- ifelse(interval>sqrt(.Machine$double.xmax),sqrt(.Machine$double.xmax),interval)
-    SE.Hosp.ctl<-sqrt(sum(virtual.pop$x^2*(interval/3.92)^2))
-    SE.Hosp.ctl<-ifelse(SE.Hosp.ctl> sqrt(.Machine$double.xmax), sqrt(.Machine$double.xmax), SE.Hosp.ctl)
+    SE.log.Hosp.ctl<-sqrt(sum(virtual.pop$x^2*(interval/3.92)^2))
     Hosp.ctl <- exp(weighted.mean(log(adj.est$Event.ctl[adj.est$SubCat==subc[i]]),w=virtual.pop$x))
-    SE.log.Hosp.ctl <- SE.Hosp.ctl/Hosp.ctl
-    interval   <- adj.est$Event.trt_ci_upper[adj.est$SubCat==subc[i]]-adj.est$Event.trt_ci_lower[adj.est$SubCat==subc[i]]
-    SE.Hosp.trt<-sqrt(sum(virtual.pop$x^2*(interval/3.92)^2))
-    SE.Hosp.trt<-ifelse(SE.Hosp.trt> sqrt(.Machine$double.xmax), sqrt(.Machine$double.xmax), SE.Hosp.trt)
+    SE.Hosp.ctl <- SE.log.Hosp.ctl * Hosp.ctl
+    SE.Hosp.ctl<-ifelse(SE.Hosp.ctl> sqrt(.Machine$double.xmax), sqrt(.Machine$double.xmax), SE.Hosp.ctl)
+
+    interval   <- log(adj.est$Event.trt_ci_upper[adj.est$SubCat==subc[i]]/adj.est$Event.trt_ci_lower[adj.est$SubCat==subc[i]])
+    interval   <- ifelse(interval>sqrt(.Machine$double.xmax),sqrt(.Machine$double.xmax),interval)
+    SE.log.Hosp.trt<-sqrt(sum(virtual.pop$x^2*(interval/3.92)^2))
     Hosp.trt <- exp(weighted.mean(log(adj.est$Event.trt[adj.est$SubCat==subc[i]]),w=virtual.pop$x))
-    SE.log.Hosp.trt <- SE.Hosp.trt/Hosp.trt
+    SE.Hosp.trt<-ifelse(SE.Hosp.trt> sqrt(.Machine$double.xmax), sqrt(.Machine$double.xmax), SE.Hosp.trt)
+    SE.Hosp.trt <- SE.log.Hosp.trt*Hosp.trt
 
     beta   <- log(Hosp.trt/Hosp.ctl)
     vbeta  <- SE.log.Hosp.trt^2 + SE.log.Hosp.ctl^2

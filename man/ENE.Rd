@@ -6,7 +6,7 @@
 \usage{
 ENE(
   file,
-  reg.model = c("poisson", "NB"),
+  reg.model = c("poisson", "NB", "quasipoisson"),
   wt.type = "treat",
   save = TRUE,
   save.plot = TRUE
